@@ -32,3 +32,8 @@ Invalid Expression
 ## Development Status
 
 This project is still under development. Some minor issues are being addressed, such as an extra `0` appearing at the end of the `Invalid Expression` message. The code is also being refined to improve its optimization, readability, and overall structure.
+
+## Contributors
+
+- Parisa Askarian – Developer
+- Ala Zahedifar – Developer

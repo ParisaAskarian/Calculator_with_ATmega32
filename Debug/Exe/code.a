@@ -1,0 +1,1354 @@
+;#include <mega32.h>
+;PCODE: $00000000 VOL: 0
+	#ifndef __SLEEP_DEFINED__
+;PCODE: $00000001 VOL: 0
+	#define __SLEEP_DEFINED__
+;PCODE: $00000002 VOL: 0
+	.EQU __se_bit=0x80
+;PCODE: $00000003 VOL: 0
+	.EQU __sm_mask=0x70
+;PCODE: $00000004 VOL: 0
+	.EQU __sm_powerdown=0x20
+;PCODE: $00000005 VOL: 0
+	.EQU __sm_powersave=0x30
+;PCODE: $00000006 VOL: 0
+	.EQU __sm_standby=0x60
+;PCODE: $00000007 VOL: 0
+	.EQU __sm_ext_standby=0x70
+;PCODE: $00000008 VOL: 0
+	.EQU __sm_adc_noise_red=0x10
+;PCODE: $00000009 VOL: 0
+	.SET power_ctrl_reg=mcucr
+;PCODE: $0000000A VOL: 0
+	#endif
+;PCODE: $0000000B VOL: 0
+;PCODE: $0000000C VOL: 0
+;#include <stdio.h>
+;#include <lcd.h>
+;#include <delay.h>
+;#include <string.h>
+;#include <stdbool.h>
+;#asm
+;PCODE: $0000000D VOL: 0
+.equ __lcd_port=0x1B;PORTA
+;PCODE: $0000000E VOL: 0
+;PCODE: $0000000F VOL: 0
+; 0000 0009 #endasm
+;
+;//keypad charecters
+;unsigned char code[4][4] = {
+;    {7, 4, 1, 10}, //first column
+;    {8, 5, 2, 0}, //second column
+;    {9, 6, 3, 11}, //third column
+;    {12, 13, 14, 15}, //fourth column
+;    };
+
+	.DSEG
+;
+;//keep the input expression from keypad
+;unsigned char exp[32];
+;int exp_size = 0;
+;
+;//a stack for operands
+;int operands[32];
+;int top_operands = -1;
+;
+; //a stack operators
+;unsigned char operators[32];
+;int top_operators = -1;
+;
+;//a stack for keep a multi digit number
+;//when the digits of number are finished, then push the full number in operands stack
+;int fix_operand[32];
+;int top_fix_oper = -1;
+;
+;void test(void){
+; 0000 0024 void test(void){
+
+	.CSEG
+;PCODE: $00000010 VOL: 0
+;PCODE: $00000011 VOL: 0
+; 0000 0025 
+; 0000 0026     //test number 1:
+; 0000 0027      //check the exp list was exacly the same as input from keypad;
+; 0000 0028     //int i;
+; 0000 0029     //lcd_clear();
+; 0000 002A     //lcd_gotoxy(0, 0);
+; 0000 002B     //for(i=0; i < exp_size; i++){
+; 0000 002C     //    lcd_putchar(exp[i]);
+; 0000 002D     //    delay_ms(30);
+; 0000 002E     //}
+; 0000 002F 
+; 0000 0030     //test number 2:
+; 0000 0031     // check the operands and operators stacks are be correct
+; 0000 0032     int i;
+; 0000 0033     lcd_clear();
+;PCODE: $00000012 VOL: 0
+;PCODE: $00000013 VOL: 0
+;	i -> R16,R17
+;PCODE: $00000014 VOL: 0
+; 0000 0034     lcd_gotoxy(0, 0);
+;PCODE: $00000015 VOL: 0
+;PCODE: $00000016 VOL: 0
+;PCODE: $00000017 VOL: 0
+;PCODE: $00000018 VOL: 0
+; 0000 0035     for(i=0; i < 2; i++){
+;PCODE: $00000019 VOL: 0
+;PCODE: $0000001A VOL: 0
+;PCODE: $0000001B VOL: 0
+;PCODE: $0000001C VOL: 0
+;PCODE: $0000001D VOL: 0
+;PCODE: $0000001E VOL: 0
+;PCODE: $0000001F VOL: 0
+;PCODE: $00000020 VOL: 0
+;PCODE: $00000021 VOL: 0
+; 0000 0036         lcd_putchar(operands[i]);
+;PCODE: $00000022 VOL: 0
+;PCODE: $00000023 VOL: 0
+;PCODE: $00000024 VOL: 0
+;PCODE: $00000025 VOL: 0
+;PCODE: $00000026 VOL: 0
+;PCODE: $00000027 VOL: 0
+; 0000 0037         lcd_putchar(',');
+;PCODE: $00000028 VOL: 0
+;PCODE: $00000029 VOL: 0
+; 0000 0038         delay_ms(30);
+;PCODE: $0000002A VOL: 0
+;PCODE: $0000002B VOL: 0
+;PCODE: $0000002C VOL: 0
+; 0000 0039     }
+;PCODE: $0000002D VOL: 0
+;PCODE: $0000002E VOL: 0
+;PCODE: $0000002F VOL: 0
+;PCODE: $00000030 VOL: 0
+;PCODE: $00000031 VOL: 0
+; 0000 003A     lcd_putchar(operators[top_operators]);
+;PCODE: $00000032 VOL: 0
+;PCODE: $00000033 VOL: 0
+;PCODE: $00000034 VOL: 0
+;PCODE: $00000035 VOL: 0
+; 0000 003B     delay_ms(30);
+;PCODE: $00000036 VOL: 0
+;PCODE: $00000037 VOL: 0
+;PCODE: $00000038 VOL: 0
+; 0000 003C 
+; 0000 003D     //test number 3:
+; 0000 003E     //check that fix_operand stack was correct
+; 0000 003F     //lcd_clear();
+; 0000 0040     //lcd_gotoxy(0, 0);
+; 0000 0041     //lcd_putchar(fix_operand[top_fix_oper]);
+; 0000 0042     //delay_ms(30);
+; 0000 0043 
+; 0000 0044 }
+;PCODE: $00000039 VOL: 0
+;PCODE: $0000003A VOL: 0
+;PCODE: $0000003B VOL: 0
+;
+;//scan the pushed key
+;unsigned char scan_key(void){
+; 0000 0047 unsigned char scan_key(void){
+;PCODE: $0000003C VOL: 0
+;PCODE: $0000003D VOL: 0
+; 0000 0048 
+; 0000 0049     unsigned char i, data, NumKey, temp;
+; 0000 004A 
+; 0000 004B     temp = 0x70;
+;PCODE: $0000003E VOL: 0
+;	i -> R17
+;	data -> R16
+;	NumKey -> R19
+;	temp -> R18
+;PCODE: $0000003F VOL: 0
+;PCODE: $00000040 VOL: 0
+; 0000 004C     NumKey = 0xFF;
+;PCODE: $00000041 VOL: 0
+;PCODE: $00000042 VOL: 0
+; 0000 004D 
+; 0000 004E     for(i = 0; i < 4; i++){
+;PCODE: $00000043 VOL: 0
+;PCODE: $00000044 VOL: 0
+;PCODE: $00000045 VOL: 0
+;PCODE: $00000046 VOL: 0
+;PCODE: $00000047 VOL: 0
+;PCODE: $00000048 VOL: 0
+;PCODE: $00000049 VOL: 0
+;PCODE: $0000004A VOL: 0
+;PCODE: $0000004B VOL: 0
+; 0000 004F         PORTC = temp;
+;PCODE: $0000004C VOL: 0
+;PCODE: $0000004D VOL: 0
+; 0000 0050         delay_ms(5);
+;PCODE: $0000004E VOL: 0
+;PCODE: $0000004F VOL: 0
+;PCODE: $00000050 VOL: 0
+; 0000 0051 
+; 0000 0052         data = PINC & 0x0F;
+;PCODE: $00000051 VOL: 0
+;PCODE: $00000052 VOL: 0
+;PCODE: $00000053 VOL: 0
+; 0000 0053 
+; 0000 0054         if( data == 0x07) {NumKey = code[0][i]; break;}
+;PCODE: $00000054 VOL: 0
+;PCODE: $00000055 VOL: 0
+;PCODE: $00000056 VOL: 0
+;PCODE: $00000057 VOL: 0
+;PCODE: $00000058 VOL: 0
+;PCODE: $00000059 VOL: 0
+;PCODE: $0000005A VOL: 0
+;PCODE: $0000005B VOL: 0
+; 0000 0055         if( data == 0x0B) {NumKey = code[1][i]; break;}
+;PCODE: $0000005C VOL: 0
+;PCODE: $0000005D VOL: 0
+;PCODE: $0000005E VOL: 0
+;PCODE: $0000005F VOL: 0
+;PCODE: $00000060 VOL: 0
+;PCODE: $00000061 VOL: 0
+;PCODE: $00000062 VOL: 0
+;PCODE: $00000063 VOL: 0
+;PCODE: $00000064 VOL: 0
+; 0000 0056         if( data == 0x0D) {NumKey = code[2][i]; break;}
+;PCODE: $00000065 VOL: 0
+;PCODE: $00000066 VOL: 0
+;PCODE: $00000067 VOL: 0
+;PCODE: $00000068 VOL: 0
+;PCODE: $00000069 VOL: 0
+;PCODE: $0000006A VOL: 0
+;PCODE: $0000006B VOL: 0
+;PCODE: $0000006C VOL: 0
+;PCODE: $0000006D VOL: 0
+; 0000 0057         if( data == 0x0E) {NumKey = code[3][i]; break;}
+;PCODE: $0000006E VOL: 0
+;PCODE: $0000006F VOL: 0
+;PCODE: $00000070 VOL: 0
+;PCODE: $00000071 VOL: 0
+;PCODE: $00000072 VOL: 0
+;PCODE: $00000073 VOL: 0
+;PCODE: $00000074 VOL: 0
+;PCODE: $00000075 VOL: 0
+;PCODE: $00000076 VOL: 0
+; 0000 0058 
+; 0000 0059         temp = ((temp >> 1)| 0x80)& 0xF0;
+;PCODE: $00000077 VOL: 0
+;PCODE: $00000078 VOL: 0
+;PCODE: $00000079 VOL: 0
+;PCODE: $0000007A VOL: 0
+;PCODE: $0000007B VOL: 0
+;PCODE: $0000007C VOL: 0
+; 0000 005A     }
+;PCODE: $0000007D VOL: 0
+;PCODE: $0000007E VOL: 0
+;PCODE: $0000007F VOL: 0
+;PCODE: $00000080 VOL: 0
+;PCODE: $00000081 VOL: 0
+; 0000 005B 
+; 0000 005C     return NumKey;
+;PCODE: $00000082 VOL: 0
+;PCODE: $00000083 VOL: 0
+;PCODE: $00000084 VOL: 0
+;PCODE: $00000085 VOL: 0
+; 0000 005D 
+; 0000 005E }
+;PCODE: $00000086 VOL: 0
+;
+;//this function is for when the input expression is invalid
+;void error(void){
+; 0000 0061 void error(void){
+;PCODE: $00000087 VOL: 0
+;PCODE: $00000088 VOL: 0
+; 0000 0062     lcd_clear();
+;PCODE: $00000089 VOL: 0
+; 0000 0063     lcd_gotoxy(5, 0);
+;PCODE: $0000008A VOL: 0
+;PCODE: $0000008B VOL: 0
+;PCODE: $0000008C VOL: 0
+;PCODE: $0000008D VOL: 0
+; 0000 0064     lcd_putsf("Invalid");
+;PCODE: $0000008E VOL: 0
+;PCODE: $0000008F VOL: 0
+;PCODE: $00000090 VOL: 0
+; 0000 0065     lcd_gotoxy(3, 1);
+;PCODE: $00000091 VOL: 0
+;PCODE: $00000092 VOL: 0
+;PCODE: $00000093 VOL: 0
+;PCODE: $00000094 VOL: 0
+; 0000 0066     lcd_putsf("Expression");
+;PCODE: $00000095 VOL: 0
+;PCODE: $00000096 VOL: 0
+;PCODE: $00000097 VOL: 0
+; 0000 0067     delay_ms(30);
+;PCODE: $00000098 VOL: 0
+;PCODE: $00000099 VOL: 0
+;PCODE: $0000009A VOL: 0
+; 0000 0068 
+; 0000 0069     exp_size =0;
+;PCODE: $0000009B VOL: 0
+; 0000 006A     top_operators = -1;
+;PCODE: $0000009C VOL: 0
+;PCODE: $0000009D VOL: 0
+; 0000 006B     top_operands = -1;
+;PCODE: $0000009E VOL: 0
+;PCODE: $0000009F VOL: 0
+; 0000 006C     top_fix_oper = -1;
+;PCODE: $000000A0 VOL: 0
+;PCODE: $000000A1 VOL: 0
+; 0000 006D     return;
+;PCODE: $000000A2 VOL: 0
+; 0000 006E }
+;PCODE: $000000A3 VOL: 0
+;
+;//pop the top value in a stack
+;void pop(int *top){
+; 0000 0071 void pop(int *top){
+;PCODE: $000000A4 VOL: 0
+;PCODE: $000000A5 VOL: 0
+; 0000 0072     if( *top == -1){
+;PCODE: $000000A6 VOL: 0
+;	*top -> Y+0
+;PCODE: $000000A7 VOL: 0
+;PCODE: $000000A8 VOL: 0
+;PCODE: $000000A9 VOL: 0
+;PCODE: $000000AA VOL: 0
+; 0000 0073         error();
+;PCODE: $000000AB VOL: 0
+; 0000 0074         return;
+;PCODE: $000000AC VOL: 0
+;PCODE: $000000AD VOL: 0
+; 0000 0075     }
+; 0000 0076     else{
+;PCODE: $000000AE VOL: 0
+; 0000 0077         (*top)--;
+;PCODE: $000000AF VOL: 0
+;PCODE: $000000B0 VOL: 0
+;PCODE: $000000B1 VOL: 0
+;PCODE: $000000B2 VOL: 0
+; 0000 0078     }
+;PCODE: $000000B3 VOL: 0
+; 0000 0079 
+; 0000 007A }
+;PCODE: $000000B4 VOL: 0
+;PCODE: $000000B5 VOL: 0
+;PCODE: $000000B6 VOL: 0
+;
+;//push a value at the top of stack
+;void push_operator(unsigned char stack[32], int *top, unsigned char value){
+; 0000 007D void push_operator(unsigned char stack[32], int *top, unsigned char value){
+;PCODE: $000000B7 VOL: 0
+;PCODE: $000000B8 VOL: 0
+; 0000 007E     if( *top == 31){
+;PCODE: $000000B9 VOL: 0
+;	stack -> Y+3
+;	*top -> Y+1
+;	value -> Y+0
+;PCODE: $000000BA VOL: 0
+;PCODE: $000000BB VOL: 0
+;PCODE: $000000BC VOL: 0
+;PCODE: $000000BD VOL: 0
+; 0000 007F         error();
+;PCODE: $000000BE VOL: 0
+; 0000 0080         return;
+;PCODE: $000000BF VOL: 0
+;PCODE: $000000C0 VOL: 0
+; 0000 0081     }
+; 0000 0082     else{
+;PCODE: $000000C1 VOL: 0
+; 0000 0083         (*top)++;
+;PCODE: $000000C2 VOL: 0
+;PCODE: $000000C3 VOL: 0
+;PCODE: $000000C4 VOL: 0
+;PCODE: $000000C5 VOL: 0
+; 0000 0084         stack[*top] = value;
+;PCODE: $000000C6 VOL: 0
+;PCODE: $000000C7 VOL: 0
+;PCODE: $000000C8 VOL: 0
+;PCODE: $000000C9 VOL: 0
+;PCODE: $000000CA VOL: 0
+;PCODE: $000000CB VOL: 0
+; 0000 0085     }
+;PCODE: $000000CC VOL: 0
+; 0000 0086 }
+;PCODE: $000000CD VOL: 0
+;PCODE: $000000CE VOL: 0
+;PCODE: $000000CF VOL: 0
+;
+;void push_operand(int stack[32], int *top, int value){
+; 0000 0088 void push_operand(int stack[32], int *top, int value){
+;PCODE: $000000D0 VOL: 0
+;PCODE: $000000D1 VOL: 0
+; 0000 0089     if( *top == 31){
+;PCODE: $000000D2 VOL: 0
+;	stack -> Y+4
+;	*top -> Y+2
+;	value -> Y+0
+;PCODE: $000000D3 VOL: 0
+;PCODE: $000000D4 VOL: 0
+;PCODE: $000000D5 VOL: 0
+;PCODE: $000000D6 VOL: 0
+; 0000 008A         error();
+;PCODE: $000000D7 VOL: 0
+; 0000 008B         return;
+;PCODE: $000000D8 VOL: 0
+;PCODE: $000000D9 VOL: 0
+; 0000 008C     }
+; 0000 008D     else{
+;PCODE: $000000DA VOL: 0
+; 0000 008E         (*top)++;
+;PCODE: $000000DB VOL: 0
+;PCODE: $000000DC VOL: 0
+;PCODE: $000000DD VOL: 0
+;PCODE: $000000DE VOL: 0
+; 0000 008F         stack[*top] = value;
+;PCODE: $000000DF VOL: 0
+;PCODE: $000000E0 VOL: 0
+;PCODE: $000000E1 VOL: 0
+;PCODE: $000000E2 VOL: 0
+;PCODE: $000000E3 VOL: 0
+;PCODE: $000000E4 VOL: 0
+;PCODE: $000000E5 VOL: 0
+; 0000 0090     }
+;PCODE: $000000E6 VOL: 0
+; 0000 0091 }
+;PCODE: $000000E7 VOL: 0
+;PCODE: $000000E8 VOL: 0
+;PCODE: $000000E9 VOL: 0
+;
+;//just see the top value in stack
+;unsigned char peek_operator(unsigned char stack[32], int top){
+; 0000 0094 unsigned char peek_operator(unsigned char stack[32], int top){
+;PCODE: $000000EA VOL: 0
+;PCODE: $000000EB VOL: 0
+; 0000 0095     if( top == -1){
+;PCODE: $000000EC VOL: 0
+;	stack -> Y+2
+;	top -> Y+0
+;PCODE: $000000ED VOL: 0
+;PCODE: $000000EE VOL: 0
+;PCODE: $000000EF VOL: 0
+; 0000 0096         error();
+;PCODE: $000000F0 VOL: 0
+; 0000 0097         return 255;
+;PCODE: $000000F1 VOL: 0
+;PCODE: $000000F2 VOL: 0
+;PCODE: $000000F3 VOL: 0
+; 0000 0098     }
+; 0000 0099 
+; 0000 009A     return stack[top];
+;PCODE: $000000F4 VOL: 0
+;PCODE: $000000F5 VOL: 0
+;PCODE: $000000F6 VOL: 0
+;PCODE: $000000F7 VOL: 0
+;PCODE: $000000F8 VOL: 0
+;PCODE: $000000F9 VOL: 0
+;PCODE: $000000FA VOL: 0
+; 0000 009B }
+;PCODE: $000000FB VOL: 0
+;
+;int peek_operand(int stack[32], int top){
+; 0000 009D int peek_operand(int stack[32], int top){
+;PCODE: $000000FC VOL: 0
+;PCODE: $000000FD VOL: 0
+; 0000 009E     if( top == -1){
+;PCODE: $000000FE VOL: 0
+;	stack -> Y+2
+;	top -> Y+0
+;PCODE: $000000FF VOL: 0
+;PCODE: $00000100 VOL: 0
+;PCODE: $00000101 VOL: 0
+; 0000 009F         error();
+;PCODE: $00000102 VOL: 0
+; 0000 00A0         return;
+;PCODE: $00000103 VOL: 0
+;PCODE: $00000104 VOL: 0
+;PCODE: $00000105 VOL: 0
+; 0000 00A1     }
+; 0000 00A2 
+; 0000 00A3     return stack[top];
+;PCODE: $00000106 VOL: 0
+;PCODE: $00000107 VOL: 0
+;PCODE: $00000108 VOL: 0
+;PCODE: $00000109 VOL: 0
+;PCODE: $0000010A VOL: 0
+;PCODE: $0000010B VOL: 0
+;PCODE: $0000010C VOL: 0
+;PCODE: $0000010D VOL: 0
+; 0000 00A4 }
+;PCODE: $0000010E VOL: 0
+;
+;//making the multi digit number and push it at the top of operand stack
+;void read_and_push_fix_operand(void){
+; 0000 00A7 void read_and_push_fix_operand(void){
+;PCODE: $0000010F VOL: 0
+;PCODE: $00000110 VOL: 0
+; 0000 00A8 
+; 0000 00A9     int value;
+; 0000 00AA     int number = 0;
+; 0000 00AB     int mul = 1;
+; 0000 00AC 
+; 0000 00AD     //test();
+; 0000 00AE 
+; 0000 00AF     //moving on the stack and read on by on charecters and convert them to a digit
+; 0000 00B0     while(top_fix_oper != -1){
+;PCODE: $00000111 VOL: 0
+;	value -> R16,R17
+;	number -> R18,R19
+;	mul -> R20,R21
+;PCODE: $00000112 VOL: 0
+;PCODE: $00000113 VOL: 0
+;PCODE: $00000114 VOL: 0
+;PCODE: $00000115 VOL: 0
+;PCODE: $00000116 VOL: 0
+;PCODE: $00000117 VOL: 0
+;PCODE: $00000118 VOL: 0
+;PCODE: $00000119 VOL: 0
+; 0000 00B1         value = peek_operand(fix_operand, top_fix_oper);
+;PCODE: $0000011A VOL: 0
+;PCODE: $0000011B VOL: 0
+;PCODE: $0000011C VOL: 0
+;PCODE: $0000011D VOL: 0
+;PCODE: $0000011E VOL: 0
+; 0000 00B2         number = number +( (value - '0') * (mul));
+;PCODE: $0000011F VOL: 0
+;PCODE: $00000120 VOL: 0
+;PCODE: $00000121 VOL: 0
+;PCODE: $00000122 VOL: 0
+;PCODE: $00000123 VOL: 0
+;PCODE: $00000124 VOL: 0
+; 0000 00B3         mul = mul * 10;
+;PCODE: $00000125 VOL: 0
+;PCODE: $00000126 VOL: 0
+;PCODE: $00000127 VOL: 0
+;PCODE: $00000128 VOL: 0
+; 0000 00B4         pop(&top_fix_oper);
+;PCODE: $00000129 VOL: 0
+;PCODE: $0000012A VOL: 0
+; 0000 00B5     }
+;PCODE: $0000012B VOL: 0
+;PCODE: $0000012C VOL: 0
+; 0000 00B6 
+; 0000 00B7     push_operand(operands, &top_operands, number);
+;PCODE: $0000012D VOL: 0
+;PCODE: $0000012E VOL: 0
+;PCODE: $0000012F VOL: 0
+;PCODE: $00000130 VOL: 0
+;PCODE: $00000131 VOL: 0
+;PCODE: $00000132 VOL: 0
+; 0000 00B8 
+; 0000 00B9 }
+;PCODE: $00000133 VOL: 0
+;PCODE: $00000134 VOL: 0
+;PCODE: $00000135 VOL: 0
+;PCODE: $00000136 VOL: 0
+;
+;//do the operators
+;// for example: if the operator is "+" , this function add two top operands stack values together
+;//and return back the result into the operands stack
+;void caculate(int num1, int num2, unsigned char operator){
+; 0000 00BE void caculate(int num1, int num2, unsigned char operator){
+;PCODE: $00000137 VOL: 0
+;PCODE: $00000138 VOL: 0
+; 0000 00BF     int result;
+; 0000 00C0 
+; 0000 00C1     //test number 4:
+; 0000 00C2     //check that num1 and num2 are correct
+; 0000 00C3     //lcd_clear();
+; 0000 00C4     //lcd_gotoxy(0, 0);
+; 0000 00C5     //lcd_putchar(num1);
+; 0000 00C6     //delay_ms(30);
+; 0000 00C7     //lcd_putchar(num2);
+; 0000 00C8     //delay_ms(30);
+; 0000 00C9     //lcd_putchar(operator);
+; 0000 00CA     //delay_ms(30);
+; 0000 00CB 
+; 0000 00CC     if(operator == '/'){
+;PCODE: $00000139 VOL: 0
+;PCODE: $0000013A VOL: 0
+;PCODE: $0000013B VOL: 0
+;	num1 -> Y+5
+;	num2 -> Y+3
+;	operator -> Y+2
+;	result -> R16,R17
+;PCODE: $0000013C VOL: 0
+;PCODE: $0000013D VOL: 0
+;PCODE: $0000013E VOL: 0
+; 0000 00CD 
+; 0000 00CE         if(num2 == 0){
+;PCODE: $0000013F VOL: 0
+;PCODE: $00000140 VOL: 0
+;PCODE: $00000141 VOL: 0
+; 0000 00CF             error();
+;PCODE: $00000142 VOL: 0
+; 0000 00D0             return;
+;PCODE: $00000143 VOL: 0
+;PCODE: $00000144 VOL: 0
+;PCODE: $00000145 VOL: 0
+;PCODE: $00000146 VOL: 0
+;PCODE: $00000147 VOL: 0
+;PCODE: $00000148 VOL: 0
+; 0000 00D1         }
+; 0000 00D2 
+; 0000 00D3         result = num1 / num2;
+;PCODE: $00000149 VOL: 0
+;PCODE: $0000014A VOL: 0
+;PCODE: $0000014B VOL: 0
+;PCODE: $0000014C VOL: 0
+;PCODE: $0000014D VOL: 0
+; 0000 00D4 
+; 0000 00D5     }
+; 0000 00D6     else if( operator == '*'){
+;PCODE: $0000014E VOL: 0
+;PCODE: $0000014F VOL: 0
+;PCODE: $00000150 VOL: 0
+;PCODE: $00000151 VOL: 0
+;PCODE: $00000152 VOL: 0
+; 0000 00D7         result = num1 * num2;
+;PCODE: $00000153 VOL: 0
+;PCODE: $00000154 VOL: 0
+;PCODE: $00000155 VOL: 0
+;PCODE: $00000156 VOL: 0
+; 0000 00D8     }
+; 0000 00D9     else if ( operator == '-'){
+;PCODE: $00000157 VOL: 0
+;PCODE: $00000158 VOL: 0
+;PCODE: $00000159 VOL: 0
+;PCODE: $0000015A VOL: 0
+;PCODE: $0000015B VOL: 0
+; 0000 00DA         result = num1 - num2;
+;PCODE: $0000015C VOL: 0
+;PCODE: $0000015D VOL: 0
+;PCODE: $0000015E VOL: 0
+;PCODE: $0000015F VOL: 0
+; 0000 00DB     }
+; 0000 00DC     else if ( operator == '+'){
+;PCODE: $00000160 VOL: 0
+;PCODE: $00000161 VOL: 0
+;PCODE: $00000162 VOL: 0
+;PCODE: $00000163 VOL: 0
+;PCODE: $00000164 VOL: 0
+; 0000 00DD         result = num1 + num2;
+;PCODE: $00000165 VOL: 0
+;PCODE: $00000166 VOL: 0
+;PCODE: $00000167 VOL: 0
+;PCODE: $00000168 VOL: 0
+; 0000 00DE     }
+; 0000 00DF 
+; 0000 00E0     push_operand(operands, &top_operands, result);
+;PCODE: $00000169 VOL: 0
+;PCODE: $0000016A VOL: 0
+;PCODE: $0000016B VOL: 0
+;PCODE: $0000016C VOL: 0
+;PCODE: $0000016D VOL: 0
+;PCODE: $0000016E VOL: 0
+;PCODE: $0000016F VOL: 0
+;PCODE: $00000170 VOL: 0
+;PCODE: $00000171 VOL: 0
+;PCODE: $00000172 VOL: 0
+; 0000 00E1 }
+;PCODE: $00000173 VOL: 0
+;PCODE: $00000174 VOL: 0
+;PCODE: $00000175 VOL: 0
+;PCODE: $00000176 VOL: 0
+;PCODE: $00000177 VOL: 0
+;PCODE: $00000178 VOL: 0
+;PCODE: $00000179 VOL: 0
+;
+;//when the expression is over and program pushed all charecters in stacks,
+;//program must start moving on operators and operands stack,
+;// for any operator, pick up two operands and caxulathe result
+;void finall_caculation(void){
+; 0000 00E6 void finall_caculation(void){
+;PCODE: $0000017A VOL: 0
+;PCODE: $0000017B VOL: 0
+; 0000 00E7     int num1;
+; 0000 00E8     int num2;
+; 0000 00E9     unsigned char operator;
+; 0000 00EA 
+; 0000 00EB     while(top_operators != -1){
+;PCODE: $0000017C VOL: 0
+;	num1 -> R16,R17
+;	num2 -> R18,R19
+;	operator -> R21
+;PCODE: $0000017D VOL: 0
+;PCODE: $0000017E VOL: 0
+;PCODE: $0000017F VOL: 0
+;PCODE: $00000180 VOL: 0
+; 0000 00EC 
+; 0000 00ED          operator = peek_operator(operators, top_operators);
+;PCODE: $00000181 VOL: 0
+;PCODE: $00000182 VOL: 0
+;PCODE: $00000183 VOL: 0
+;PCODE: $00000184 VOL: 0
+;PCODE: $00000185 VOL: 0
+; 0000 00EE          pop(&top_operators);
+;PCODE: $00000186 VOL: 0
+;PCODE: $00000187 VOL: 0
+; 0000 00EF 
+; 0000 00F0          if(top_operands < 1){
+;PCODE: $00000188 VOL: 0
+;PCODE: $00000189 VOL: 0
+;PCODE: $0000018A VOL: 0
+; 0000 00F1             error();
+;PCODE: $0000018B VOL: 0
+; 0000 00F2             return;
+;PCODE: $0000018C VOL: 0
+;PCODE: $0000018D VOL: 0
+;PCODE: $0000018E VOL: 0
+; 0000 00F3         }
+; 0000 00F4 
+; 0000 00F5          num2 = peek_operand(operands, top_operands);
+;PCODE: $0000018F VOL: 0
+;PCODE: $00000190 VOL: 0
+;PCODE: $00000191 VOL: 0
+;PCODE: $00000192 VOL: 0
+;PCODE: $00000193 VOL: 0
+;PCODE: $00000194 VOL: 0
+; 0000 00F6          pop(&top_operands);
+;PCODE: $00000195 VOL: 0
+;PCODE: $00000196 VOL: 0
+; 0000 00F7 
+; 0000 00F8          num1 = peek_operand(operands, top_operands);
+;PCODE: $00000197 VOL: 0
+;PCODE: $00000198 VOL: 0
+;PCODE: $00000199 VOL: 0
+;PCODE: $0000019A VOL: 0
+;PCODE: $0000019B VOL: 0
+; 0000 00F9          pop(&top_operands);
+;PCODE: $0000019C VOL: 0
+;PCODE: $0000019D VOL: 0
+; 0000 00FA 
+; 0000 00FB          caculate(num1, num2, operator);
+;PCODE: $0000019E VOL: 0
+;PCODE: $0000019F VOL: 0
+;PCODE: $000001A0 VOL: 0
+;PCODE: $000001A1 VOL: 0
+; 0000 00FC     }
+;PCODE: $000001A2 VOL: 0
+;PCODE: $000001A3 VOL: 0
+; 0000 00FD     if(top_operands > 0 || top_operands == -1){
+;PCODE: $000001A4 VOL: 0
+;PCODE: $000001A5 VOL: 0
+;PCODE: $000001A6 VOL: 0
+;PCODE: $000001A7 VOL: 0
+;PCODE: $000001A8 VOL: 0
+;PCODE: $000001A9 VOL: 0
+;PCODE: $000001AA VOL: 0
+; 0000 00FE          error();
+;PCODE: $000001AB VOL: 0
+; 0000 00FF          return ;
+;PCODE: $000001AC VOL: 0
+;PCODE: $000001AD VOL: 0
+;PCODE: $000001AE VOL: 0
+; 0000 0100 
+; 0000 0101     }
+; 0000 0102 
+; 0000 0103 }
+;PCODE: $000001AF VOL: 0
+;PCODE: $000001B0 VOL: 0
+;PCODE: $000001B1 VOL: 0
+;PCODE: $000001B2 VOL: 0
+;PCODE: $000001B3 VOL: 0
+;
+;//this function give the operators a value,
+;//then program can compare them:
+;// the value of "-" and "+" is 1
+;// the value of "*" and "/" is 2
+;int value(unsigned char operator){
+; 0000 0109 int value(unsigned char operator){
+;PCODE: $000001B4 VOL: 0
+;PCODE: $000001B5 VOL: 0
+; 0000 010A     int val;
+; 0000 010B 
+; 0000 010C     if(operator == '-' || operator == '+'){
+;PCODE: $000001B6 VOL: 0
+;PCODE: $000001B7 VOL: 0
+;PCODE: $000001B8 VOL: 0
+;	operator -> Y+2
+;	val -> R16,R17
+;PCODE: $000001B9 VOL: 0
+;PCODE: $000001BA VOL: 0
+;PCODE: $000001BB VOL: 0
+;PCODE: $000001BC VOL: 0
+;PCODE: $000001BD VOL: 0
+;PCODE: $000001BE VOL: 0
+;PCODE: $000001BF VOL: 0
+;PCODE: $000001C0 VOL: 0
+; 0000 010D         val = 1;
+;PCODE: $000001C1 VOL: 0
+;PCODE: $000001C2 VOL: 0
+; 0000 010E     }
+; 0000 010F     else{
+;PCODE: $000001C3 VOL: 0
+;PCODE: $000001C4 VOL: 0
+; 0000 0110         val = 2;
+;PCODE: $000001C5 VOL: 0
+;PCODE: $000001C6 VOL: 0
+; 0000 0111     }
+;PCODE: $000001C7 VOL: 0
+; 0000 0112 
+; 0000 0113     return val;
+;PCODE: $000001C8 VOL: 0
+;PCODE: $000001C9 VOL: 0
+;PCODE: $000001CA VOL: 0
+;PCODE: $000001CB VOL: 0
+;PCODE: $000001CC VOL: 0
+;PCODE: $000001CD VOL: 0
+;PCODE: $000001CE VOL: 0
+; 0000 0114 }
+;PCODE: $000001CF VOL: 0
+;
+;// this function is the brain of the program:
+;// moving in expression and push the operators in operators stack,
+;// and push the operands in operands stack.
+;// if the value of the top operator in operators stack,
+;// is bigger than / equal the value of the current operator in
+;// expression, first calculate the top operator in stack,
+;// then push the current operator.
+;void caculate_exp(void){
+; 0000 011D void caculate_exp(void){
+;PCODE: $000001D0 VOL: 0
+;PCODE: $000001D1 VOL: 0
+; 0000 011E     int i;
+; 0000 011F 
+; 0000 0120     unsigned char charecter;
+; 0000 0121     unsigned char charecterInStack;
+; 0000 0122 
+; 0000 0123     int num1;
+; 0000 0124     int num2;
+; 0000 0125 
+; 0000 0126     bool expect_operand = true;
+; 0000 0127 
+; 0000 0128     char valid_operators[] = "-+/*";
+; 0000 0129 
+; 0000 012A     if( exp_size == 0){
+;PCODE: $000001D2 VOL: 0
+;PCODE: $000001D3 VOL: 0
+;PCODE: $000001D4 VOL: 0
+;PCODE: $000001D5 VOL: 0
+;PCODE: $000001D6 VOL: 0
+;PCODE: $000001D7 VOL: 0
+;PCODE: $000001D8 VOL: 0
+;PCODE: $000001D9 VOL: 0
+;PCODE: $000001DA VOL: 0
+;PCODE: $000001DB VOL: 0
+;PCODE: $000001DC VOL: 0
+;PCODE: $000001DD VOL: 0
+;PCODE: $000001DE VOL: 0
+;PCODE: $000001DF VOL: 0
+;	i -> R16,R17
+;	charecter -> R19
+;	charecterInStack -> R18
+;	num1 -> R20,R21
+;	num2 -> Y+12
+;	expect_operand -> Y+11
+;	valid_operators -> Y+6
+;PCODE: $000001E0 VOL: 0
+;PCODE: $000001E1 VOL: 0
+; 0000 012B         error();
+;PCODE: $000001E2 VOL: 0
+; 0000 012C         return;
+;PCODE: $000001E3 VOL: 0
+;PCODE: $000001E4 VOL: 0
+;PCODE: $000001E5 VOL: 0
+; 0000 012D     }
+; 0000 012E 
+; 0000 012F     for(i=0; i< exp_size ; i++){
+;PCODE: $000001E6 VOL: 0
+;PCODE: $000001E7 VOL: 0
+;PCODE: $000001E8 VOL: 0
+;PCODE: $000001E9 VOL: 0
+;PCODE: $000001EA VOL: 0
+;PCODE: $000001EB VOL: 0
+;PCODE: $000001EC VOL: 0
+;PCODE: $000001ED VOL: 0
+;PCODE: $000001EE VOL: 0
+;PCODE: $000001EF VOL: 0
+; 0000 0130 
+; 0000 0131         //test();
+; 0000 0132 
+; 0000 0133         charecter = exp[i];
+;PCODE: $000001F0 VOL: 0
+;PCODE: $000001F1 VOL: 0
+;PCODE: $000001F2 VOL: 0
+; 0000 0134 
+; 0000 0135         if(strchr(valid_operators, charecter) != NULL  ){
+;PCODE: $000001F3 VOL: 0
+;PCODE: $000001F4 VOL: 0
+;PCODE: $000001F5 VOL: 0
+;PCODE: $000001F6 VOL: 0
+;PCODE: $000001F7 VOL: 0
+;PCODE: $000001F8 VOL: 0
+; 0000 0136 
+; 0000 0137             if(expect_operand == true){
+;PCODE: $000001F9 VOL: 0
+;PCODE: $000001FA VOL: 0
+;PCODE: $000001FB VOL: 0
+; 0000 0138                 error();
+;PCODE: $000001FC VOL: 0
+; 0000 0139                 return;
+;PCODE: $000001FD VOL: 0
+;PCODE: $000001FE VOL: 0
+;PCODE: $000001FF VOL: 0
+; 0000 013A             }
+; 0000 013B 
+; 0000 013C             read_and_push_fix_operand();
+;PCODE: $00000200 VOL: 0
+;PCODE: $00000201 VOL: 0
+; 0000 013D 
+; 0000 013E             if(top_operators == -1){
+;PCODE: $00000202 VOL: 0
+;PCODE: $00000203 VOL: 0
+;PCODE: $00000204 VOL: 0
+; 0000 013F                 push_operator(operators, &top_operators, charecter);
+;PCODE: $00000205 VOL: 0
+;PCODE: $00000206 VOL: 0
+;PCODE: $00000207 VOL: 0
+;PCODE: $00000208 VOL: 0
+;PCODE: $00000209 VOL: 0
+;PCODE: $0000020A VOL: 0
+; 0000 0140 
+; 0000 0141             }
+; 0000 0142             else{
+;PCODE: $0000020B VOL: 0
+;PCODE: $0000020C VOL: 0
+; 0000 0143 
+; 0000 0144                 while (top_operators != -1){
+;PCODE: $0000020D VOL: 0
+;PCODE: $0000020E VOL: 0
+;PCODE: $0000020F VOL: 0
+;PCODE: $00000210 VOL: 0
+; 0000 0145 
+; 0000 0146                     charecterInStack = peek_operator(operators, top_operators);
+;PCODE: $00000211 VOL: 0
+;PCODE: $00000212 VOL: 0
+;PCODE: $00000213 VOL: 0
+;PCODE: $00000214 VOL: 0
+;PCODE: $00000215 VOL: 0
+; 0000 0147 
+; 0000 0148                     if(value(charecter)> value(charecterInStack)){
+;PCODE: $00000216 VOL: 0
+;PCODE: $00000217 VOL: 0
+;PCODE: $00000218 VOL: 0
+;PCODE: $00000219 VOL: 0
+;PCODE: $0000021A VOL: 0
+;PCODE: $0000021B VOL: 0
+;PCODE: $0000021C VOL: 0
+;PCODE: $0000021D VOL: 0
+; 0000 0149                         break;
+;PCODE: $0000021E VOL: 0
+; 0000 014A                     }
+; 0000 014B 
+; 0000 014C                     if(top_operands < 1){
+;PCODE: $0000021F VOL: 0
+;PCODE: $00000220 VOL: 0
+;PCODE: $00000221 VOL: 0
+;PCODE: $00000222 VOL: 0
+; 0000 014D                         error();
+;PCODE: $00000223 VOL: 0
+; 0000 014E                         return;
+;PCODE: $00000224 VOL: 0
+;PCODE: $00000225 VOL: 0
+;PCODE: $00000226 VOL: 0
+; 0000 014F 
+; 0000 0150                     }
+; 0000 0151 
+; 0000 0152                     num2 = peek_operand(operands, top_operands);
+;PCODE: $00000227 VOL: 0
+;PCODE: $00000228 VOL: 0
+;PCODE: $00000229 VOL: 0
+;PCODE: $0000022A VOL: 0
+;PCODE: $0000022B VOL: 0
+;PCODE: $0000022C VOL: 0
+; 0000 0153                     pop(&top_operands);
+;PCODE: $0000022D VOL: 0
+;PCODE: $0000022E VOL: 0
+; 0000 0154 
+; 0000 0155                     num1 = peek_operand(operands, top_operands);
+;PCODE: $0000022F VOL: 0
+;PCODE: $00000230 VOL: 0
+;PCODE: $00000231 VOL: 0
+;PCODE: $00000232 VOL: 0
+;PCODE: $00000233 VOL: 0
+; 0000 0156                     pop(&top_operands);
+;PCODE: $00000234 VOL: 0
+;PCODE: $00000235 VOL: 0
+; 0000 0157 
+; 0000 0158                     caculate(num1, num2, charecterInStack);
+;PCODE: $00000236 VOL: 0
+;PCODE: $00000237 VOL: 0
+;PCODE: $00000238 VOL: 0
+;PCODE: $00000239 VOL: 0
+;PCODE: $0000023A VOL: 0
+; 0000 0159                     pop(&top_operators);
+;PCODE: $0000023B VOL: 0
+;PCODE: $0000023C VOL: 0
+; 0000 015A 
+; 0000 015B                 }
+;PCODE: $0000023D VOL: 0
+;PCODE: $0000023E VOL: 0
+; 0000 015C 
+; 0000 015D                 push_operator(operators,&top_operators,charecter);
+;PCODE: $0000023F VOL: 0
+;PCODE: $00000240 VOL: 0
+;PCODE: $00000241 VOL: 0
+;PCODE: $00000242 VOL: 0
+;PCODE: $00000243 VOL: 0
+;PCODE: $00000244 VOL: 0
+; 0000 015E 
+; 0000 015F                 expect_operand = true;
+;PCODE: $00000245 VOL: 0
+;PCODE: $00000246 VOL: 0
+; 0000 0160             }
+;PCODE: $00000247 VOL: 0
+; 0000 0161         }
+; 0000 0162         else{
+;PCODE: $00000248 VOL: 0
+;PCODE: $00000249 VOL: 0
+; 0000 0163 
+; 0000 0164             push_operand(fix_operand, &top_fix_oper,charecter);
+;PCODE: $0000024A VOL: 0
+;PCODE: $0000024B VOL: 0
+;PCODE: $0000024C VOL: 0
+;PCODE: $0000024D VOL: 0
+;PCODE: $0000024E VOL: 0
+;PCODE: $0000024F VOL: 0
+;PCODE: $00000250 VOL: 0
+; 0000 0165 
+; 0000 0166             expect_operand = false;
+;PCODE: $00000251 VOL: 0
+;PCODE: $00000252 VOL: 0
+; 0000 0167 
+; 0000 0168             //test();
+; 0000 0169 
+; 0000 016A         }
+;PCODE: $00000253 VOL: 0
+; 0000 016B 
+; 0000 016C     }
+;PCODE: $00000254 VOL: 0
+;PCODE: $00000255 VOL: 0
+;PCODE: $00000256 VOL: 0
+;PCODE: $00000257 VOL: 0
+;PCODE: $00000258 VOL: 0
+; 0000 016D 
+; 0000 016E     if(top_fix_oper != -1){
+;PCODE: $00000259 VOL: 0
+;PCODE: $0000025A VOL: 0
+;PCODE: $0000025B VOL: 0
+; 0000 016F         read_and_push_fix_operand();
+;PCODE: $0000025C VOL: 0
+; 0000 0170     }
+; 0000 0171 
+; 0000 0172     if( top_operators != -1 && top_operands >= 1 ){
+;PCODE: $0000025D VOL: 0
+;PCODE: $0000025E VOL: 0
+;PCODE: $0000025F VOL: 0
+;PCODE: $00000260 VOL: 0
+;PCODE: $00000261 VOL: 0
+;PCODE: $00000262 VOL: 0
+;PCODE: $00000263 VOL: 0
+;PCODE: $00000264 VOL: 0
+;PCODE: $00000265 VOL: 0
+;PCODE: $00000266 VOL: 0
+;PCODE: $00000267 VOL: 0
+; 0000 0173 
+; 0000 0174         //test();
+; 0000 0175 
+; 0000 0176         finall_caculation();
+;PCODE: $00000268 VOL: 0
+; 0000 0177         return ;
+;PCODE: $00000269 VOL: 0
+;PCODE: $0000026A VOL: 0
+;PCODE: $0000026B VOL: 0
+; 0000 0178     }
+; 0000 0179     else{
+;PCODE: $0000026C VOL: 0
+; 0000 017A         error();
+;PCODE: $0000026D VOL: 0
+; 0000 017B         return;
+;PCODE: $0000026E VOL: 0
+;PCODE: $0000026F VOL: 0
+;PCODE: $00000270 VOL: 0
+; 0000 017C     }
+;PCODE: $00000271 VOL: 0
+; 0000 017D 
+; 0000 017E }
+;PCODE: $00000272 VOL: 0
+;PCODE: $00000273 VOL: 0
+;PCODE: $00000274 VOL: 0
+;PCODE: $00000275 VOL: 0
+;
+;//show the expression on LCD and when click on "=" key,
+;// show the result of the expression .
+;void show_on_lcd(void){
+; 0000 0182 void show_on_lcd(void){
+;PCODE: $00000276 VOL: 0
+;PCODE: $00000277 VOL: 0
+; 0000 0183     unsigned char Key;
+; 0000 0184     int result;
+; 0000 0185     char result_string[10];
+; 0000 0186 
+; 0000 0187     DDRC = 0xF0;
+;PCODE: $00000278 VOL: 0
+;PCODE: $00000279 VOL: 0
+;	Key -> R17
+;	result -> R18,R19
+;	result_string -> Y+4
+;PCODE: $0000027A VOL: 0
+;PCODE: $0000027B VOL: 0
+; 0000 0188     PORTC = 0x0F;
+;PCODE: $0000027C VOL: 0
+;PCODE: $0000027D VOL: 0
+; 0000 0189 
+; 0000 018A     DDRA = 0xFF;
+;PCODE: $0000027E VOL: 0
+;PCODE: $0000027F VOL: 0
+; 0000 018B     PORTA = 0x00;
+;PCODE: $00000280 VOL: 0
+;PCODE: $00000281 VOL: 0
+; 0000 018C 
+; 0000 018D     lcd_init(16);
+;PCODE: $00000282 VOL: 0
+;PCODE: $00000283 VOL: 0
+; 0000 018E     lcd_clear();
+;PCODE: $00000284 VOL: 0
+; 0000 018F     lcd_gotoxy(0,0);
+;PCODE: $00000285 VOL: 0
+;PCODE: $00000286 VOL: 0
+;PCODE: $00000287 VOL: 0
+;PCODE: $00000288 VOL: 0
+; 0000 0190 
+; 0000 0191     while(1){
+;PCODE: $00000289 VOL: 0
+; 0000 0192         Key = scan_key();
+;PCODE: $0000028A VOL: 0
+;PCODE: $0000028B VOL: 0
+; 0000 0193 
+; 0000 0194         if (Key != 0xFF){
+;PCODE: $0000028C VOL: 0
+;PCODE: $0000028D VOL: 0
+;PCODE: $0000028E VOL: 0
+; 0000 0195 
+; 0000 0196             if( Key < 10){
+;PCODE: $0000028F VOL: 0
+;PCODE: $00000290 VOL: 0
+;PCODE: $00000291 VOL: 0
+; 0000 0197                 lcd_putchar(Key + '0');
+;PCODE: $00000292 VOL: 0
+;PCODE: $00000293 VOL: 0
+;PCODE: $00000294 VOL: 0
+; 0000 0198                 exp[exp_size] = Key + '0';
+;PCODE: $00000295 VOL: 0
+;PCODE: $00000296 VOL: 0
+;PCODE: $00000297 VOL: 0
+;PCODE: $00000298 VOL: 0
+;PCODE: $00000299 VOL: 0
+; 0000 0199                 exp_size++;
+;PCODE: $0000029A VOL: 0
+;PCODE: $0000029B VOL: 0
+;PCODE: $0000029C VOL: 0
+; 0000 019A 
+; 0000 019B             }
+; 0000 019C             else if( Key == 10){
+;PCODE: $0000029D VOL: 0
+;PCODE: $0000029E VOL: 0
+;PCODE: $0000029F VOL: 0
+;PCODE: $000002A0 VOL: 0
+;PCODE: $000002A1 VOL: 0
+; 0000 019D                 lcd_clear();
+;PCODE: $000002A2 VOL: 0
+; 0000 019E 
+; 0000 019F                 exp_size = 0;
+;PCODE: $000002A3 VOL: 0
+; 0000 01A0 
+; 0000 01A1                 top_operators = -1;
+;PCODE: $000002A4 VOL: 0
+;PCODE: $000002A5 VOL: 0
+; 0000 01A2                 top_operands = -1;
+;PCODE: $000002A6 VOL: 0
+;PCODE: $000002A7 VOL: 0
+; 0000 01A3                 top_fix_oper = -1;
+;PCODE: $000002A8 VOL: 0
+;PCODE: $000002A9 VOL: 0
+; 0000 01A4             }
+; 0000 01A5             else if( Key == 11){
+;PCODE: $000002AA VOL: 0
+;PCODE: $000002AB VOL: 0
+;PCODE: $000002AC VOL: 0
+;PCODE: $000002AD VOL: 0
+;PCODE: $000002AE VOL: 0
+; 0000 01A6 
+; 0000 01A7                 //test();
+; 0000 01A8 
+; 0000 01A9                 lcd_clear();
+;PCODE: $000002AF VOL: 0
+; 0000 01AA                 lcd_gotoxy(0,0);
+;PCODE: $000002B0 VOL: 0
+;PCODE: $000002B1 VOL: 0
+;PCODE: $000002B2 VOL: 0
+;PCODE: $000002B3 VOL: 0
+; 0000 01AB                 caculate_exp();
+;PCODE: $000002B4 VOL: 0
+; 0000 01AC                 result = peek_operand(operands, top_operands);
+;PCODE: $000002B5 VOL: 0
+;PCODE: $000002B6 VOL: 0
+;PCODE: $000002B7 VOL: 0
+;PCODE: $000002B8 VOL: 0
+;PCODE: $000002B9 VOL: 0
+; 0000 01AD 
+; 0000 01AE                 sprintf(result_string, "%d", result);
+;PCODE: $000002BA VOL: 0
+;PCODE: $000002BB VOL: 0
+;PCODE: $000002BC VOL: 0
+;PCODE: $000002BD VOL: 0
+;PCODE: $000002BE VOL: 0
+;PCODE: $000002BF VOL: 0
+;PCODE: $000002C0 VOL: 0
+;PCODE: $000002C1 VOL: 0
+;PCODE: $000002C2 VOL: 0
+;PCODE: $000002C3 VOL: 0
+;PCODE: $000002C4 VOL: 0
+;PCODE: $000002C5 VOL: 0
+; 0000 01AF                 lcd_puts(result_string);
+;PCODE: $000002C6 VOL: 0
+;PCODE: $000002C7 VOL: 0
+; 0000 01B0                 delay_ms(100);
+;PCODE: $000002C8 VOL: 0
+;PCODE: $000002C9 VOL: 0
+;PCODE: $000002CA VOL: 0
+; 0000 01B1 
+; 0000 01B2                 exp_size = 0;
+;PCODE: $000002CB VOL: 0
+; 0000 01B3                 top_operators = -1;
+;PCODE: $000002CC VOL: 0
+;PCODE: $000002CD VOL: 0
+; 0000 01B4                 top_operands = -1;
+;PCODE: $000002CE VOL: 0
+;PCODE: $000002CF VOL: 0
+; 0000 01B5                 top_fix_oper = -1;
+;PCODE: $000002D0 VOL: 0
+;PCODE: $000002D1 VOL: 0
+; 0000 01B6 
+; 0000 01B7             }
+; 0000 01B8             else if (Key == 12){
+;PCODE: $000002D2 VOL: 0
+;PCODE: $000002D3 VOL: 0
+;PCODE: $000002D4 VOL: 0
+;PCODE: $000002D5 VOL: 0
+;PCODE: $000002D6 VOL: 0
+; 0000 01B9                 lcd_putchar('/');
+;PCODE: $000002D7 VOL: 0
+;PCODE: $000002D8 VOL: 0
+; 0000 01BA                 exp[exp_size] = '/';
+;PCODE: $000002D9 VOL: 0
+;PCODE: $000002DA VOL: 0
+;PCODE: $000002DB VOL: 0
+;PCODE: $000002DC VOL: 0
+; 0000 01BB                 exp_size++;
+;PCODE: $000002DD VOL: 0
+;PCODE: $000002DE VOL: 0
+;PCODE: $000002DF VOL: 0
+; 0000 01BC 
+; 0000 01BD             }
+; 0000 01BE             else if (Key == 13){
+;PCODE: $000002E0 VOL: 0
+;PCODE: $000002E1 VOL: 0
+;PCODE: $000002E2 VOL: 0
+;PCODE: $000002E3 VOL: 0
+;PCODE: $000002E4 VOL: 0
+; 0000 01BF                 lcd_putchar('*');
+;PCODE: $000002E5 VOL: 0
+;PCODE: $000002E6 VOL: 0
+; 0000 01C0                 exp[exp_size] = '*';
+;PCODE: $000002E7 VOL: 0
+;PCODE: $000002E8 VOL: 0
+;PCODE: $000002E9 VOL: 0
+;PCODE: $000002EA VOL: 0
+; 0000 01C1                 exp_size++;
+;PCODE: $000002EB VOL: 0
+;PCODE: $000002EC VOL: 0
+;PCODE: $000002ED VOL: 0
+; 0000 01C2 
+; 0000 01C3             }
+; 0000 01C4             else if (Key == 14){
+;PCODE: $000002EE VOL: 0
+;PCODE: $000002EF VOL: 0
+;PCODE: $000002F0 VOL: 0
+;PCODE: $000002F1 VOL: 0
+;PCODE: $000002F2 VOL: 0
+; 0000 01C5                 lcd_putchar('-');
+;PCODE: $000002F3 VOL: 0
+;PCODE: $000002F4 VOL: 0
+; 0000 01C6                 exp[exp_size] = '-';
+;PCODE: $000002F5 VOL: 0
+;PCODE: $000002F6 VOL: 0
+;PCODE: $000002F7 VOL: 0
+;PCODE: $000002F8 VOL: 0
+; 0000 01C7                 exp_size++;
+;PCODE: $000002F9 VOL: 0
+;PCODE: $000002FA VOL: 0
+;PCODE: $000002FB VOL: 0
+; 0000 01C8 
+; 0000 01C9             }
+; 0000 01CA             else if (Key == 15){
+;PCODE: $000002FC VOL: 0
+;PCODE: $000002FD VOL: 0
+;PCODE: $000002FE VOL: 0
+;PCODE: $000002FF VOL: 0
+;PCODE: $00000300 VOL: 0
+; 0000 01CB                 lcd_putchar('+');
+;PCODE: $00000301 VOL: 0
+;PCODE: $00000302 VOL: 0
+; 0000 01CC                 exp[exp_size] = '+';
+;PCODE: $00000303 VOL: 0
+;PCODE: $00000304 VOL: 0
+;PCODE: $00000305 VOL: 0
+;PCODE: $00000306 VOL: 0
+; 0000 01CD                 exp_size++;
+;PCODE: $00000307 VOL: 0
+;PCODE: $00000308 VOL: 0
+;PCODE: $00000309 VOL: 0
+; 0000 01CE             }
+; 0000 01CF 
+; 0000 01D0             delay_ms(30);
+;PCODE: $0000030A VOL: 0
+;PCODE: $0000030B VOL: 0
+;PCODE: $0000030C VOL: 0
+;PCODE: $0000030D VOL: 0
+;PCODE: $0000030E VOL: 0
+;PCODE: $0000030F VOL: 0
+;PCODE: $00000310 VOL: 0
+;PCODE: $00000311 VOL: 0
+;PCODE: $00000312 VOL: 0
+;PCODE: $00000313 VOL: 0
+; 0000 01D1 
+; 0000 01D2             while(scan_key() != 0xFF){
+;PCODE: $00000314 VOL: 0
+;PCODE: $00000315 VOL: 0
+;PCODE: $00000316 VOL: 0
+;PCODE: $00000317 VOL: 0
+; 0000 01D3                 delay_ms(20);
+;PCODE: $00000318 VOL: 0
+;PCODE: $00000319 VOL: 0
+;PCODE: $0000031A VOL: 0
+; 0000 01D4             }
+;PCODE: $0000031B VOL: 0
+;PCODE: $0000031C VOL: 0
+; 0000 01D5 
+; 0000 01D6 
+; 0000 01D7         }
+; 0000 01D8     }
+;PCODE: $0000031D VOL: 0
+;PCODE: $0000031E VOL: 0
+;PCODE: $0000031F VOL: 0
+; 0000 01D9 }
+;PCODE: $00000320 VOL: 0
+;PCODE: $00000321 VOL: 0
+;PCODE: $00000322 VOL: 0
+;PCODE: $00000323 VOL: 0
+;
+;void main( void){
+; 0000 01DB void main( void){
+;PCODE: $00000324 VOL: 0
+; 0000 01DC     show_on_lcd();
+;PCODE: $00000325 VOL: 0
+; 0000 01DD }
+;PCODE: $00000326 VOL: 0
+;PCODE: $00000327 VOL: 0
+;PCODE: $00000328 VOL: 0
